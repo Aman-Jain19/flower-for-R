@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A tiny thing for you because you denied me from getting flowers for you🌻</title>
+<style>
+  :root{--bg1:#fff8d6;--bg2:#eaf6ff;--accent:#f7c948;--petal:#ffd84d;--center:#6b4b16;--leaf:#2f9e44;--soil:#7a5234;--pot:#d8bfa3}
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+    background:linear-gradient(140deg,var(--bg1),var(--bg2));
+    color:#333;overflow:hidden;
+  }
+  .card{
+    width:min(92vw,520px);background:#ffffff;border-radius:24px;padding:22px 18px 20px;
+    box-shadow:0 18px 60px rgba(0,0,0,.15);text-align:center;position:relative;z-index:2
+  }
+  h1{margin:.2em 0 .1em;font-size:clamp(22px,4.6vw,30px)}
+  p.sub{margin:.2em 0 1em;color:#666}
+  .stage{font-size:14px;color:#777;margin-top:8px}
+  .hint{font-size:13px;color:#999;margin-top:10px}
+  .name{color:var(--accent)}
+
+  /* pot */
+  .scene{position:relative;height:300px}
+  .pot{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;width:180px;height:110px;background:var(--pot);border-radius:12px 12px 22px 22px;box-shadow:inset 0 -10px 0 rgba(0,0,0,.06)}
+  .soil{position:absolute;left:50%;transform:translateX(-50%);bottom:100px;width:160px;height:24px;background:var(--soil);border-radius:50%}
+
+  /* plant (SVG sized by container) */
+  .plant{position:absolute;left:50%;transform:translateX(-50%);bottom:110px;width:220px;height:220px}
+  svg{width:100%;height:100%}
+  .stem{stroke:var(--leaf);stroke-width:6;fill:none;stroke-linecap:round;stroke-dasharray:260;stroke-dashoffset:260}
+  .leaf{fill:var(--leaf);opacity:0;transform-origin:center;transform:scale(.3)}
+  .petal{fill:var(--petal);opacity:0;transform-origin:center;transform:scale(.2)}
+  .center{fill:var(--center);opacity:0}
+
+  /* floating hearts */
+  .heart{position:fixed;width:12px;height:12px;background:var(--accent);transform:rotate(45deg);opacity:.5;z-index:1}
+  .heart::before,.heart::after{content:'';position:absolute;width:12px;height:12px;background:inherit;border-radius:50%}
+  .heart::before{left:-6px}
+  .heart::after{top:-6px}
+  @keyframes float{to{transform:translateY(-110vh) rotate(45deg);opacity:0}}
+
+  .footer{margin-top:12px;font-size:12px;color:#aaa}
+  .btn{margin-top:10px;border:none;border-radius:999px;padding:10px 16px;background:#eee;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Hi <span class="name" id="herName">Radhika</span> 🌱</h1>
+    <p class="sub">Tap anywhere to help this grow.</p>
+
+    <div class="scene" id="tapArea">
+      <div class="soil"></div>
+      <div class="pot"></div>
+      <div class="plant">
+        <svg viewBox="0 0 200 200">
+          <!-- stem path from soil upward -->
+          <path id="stem" class="stem" d="M100 200 C 100 170, 110 150, 100 130 S 90 95, 100 70 S 110 40, 100 20"/>
+
+          <!-- leaves -->
+          <ellipse id="leaf1" class="leaf" cx="120" cy="120" rx="18" ry="10"/>
+          <ellipse id="leaf2" class="leaf" cx="80" cy="100" rx="18" ry="10"/>
+
+          <!-- flower -->
+          <g id="flower" transform="translate(100,30)">
+            <!-- extra sunflower petals -->
+            <circle class="petal" r="10" cx="0" cy="-28"/>
+            <circle class="petal" r="10" cx="20" cy="-22"/>
+            <circle class="petal" r="10" cx="28" cy="0"/>
+            <circle class="petal" r="10" cx="20" cy="22"/>
+            <circle class="petal" r="10" cx="0" cy="28"/>
+            <circle class="petal" r="10" cx="-20" cy="22"/>
+            <circle class="petal" r="10" cx="-28" cy="0"/>
+            <circle class="petal" r="10" cx="-20" cy="-22"/>
+            <circle id="center" class="center" r="8"/>
+            <circle id="p1" class="petal" r="10" cx="0" cy="-18"/>
+            <circle id="p2" class="petal" r="10" cx="15" cy="-9"/>
+            <circle id="p3" class="petal" r="10" cx="15" cy="9"/>
+            <circle id="p4" class="petal" r="10" cx="0" cy="18"/>
+            <circle id="p5" class="petal" r="10" cx="-15" cy="9"/>
+            <circle id="p6" class="petal" r="10" cx="-15" cy="-9"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">Stage 0 / 5</div>
+    <div class="hint">(It likes gentle taps.)</div>
+    <div class="footer" id="message"></div>
+    <button class="btn" id="reset">Start again</button>
+  </div>
+
+<script>
+  const stem = document.getElementById('stem');
+  const leaves = [document.getElementById('leaf1'), document.getElementById('leaf2')];
+  const petals = ['p1','p2','p3','p4','p5','p6'].map(id=>document.getElementById(id));
+  const center = document.getElementById('center');
+  const tapArea = document.getElementById('tapArea');
+  const stageEl = document.getElementById('stage');
+  const messageEl = document.getElementById('message');
+  const nameEl = document.getElementById('herName');
+  const resetBtn = document.getElementById('reset');
+
+  let stage = 0; // 0..5
+  let easterEnabled = false; // avoid adding listeners multiple times
+
+  function update(){
+    stageEl.textContent = `Stage ${stage} / 5`;
+    // stem grows in 3 steps
+    const offsets = [260, 180, 90, 0];
+    stem.style.transition = 'stroke-dashoffset 600ms ease';
+    stem.style.strokeDashoffset = offsets[Math.min(stage,3)];
+
+    // leaves appear at 2 & 3
+    if(stage>=2){
+      leaves[0].style.transition='all 500ms ease';
+      leaves[0].style.opacity=1; leaves[0].style.transform='scale(1)';
+    }
+    if(stage>=3){
+      leaves[1].style.transition='all 500ms ease';
+      leaves[1].style.opacity=1; leaves[1].style.transform='scale(1)';
+    }
+
+    // petals at 4
+    if(stage>=4){
+      petals.forEach((p,i)=>{setTimeout(()=>{p.style.transition='all 450ms ease';p.style.opacity=1;p.style.transform='scale(1)';}, i*70);});
+      center.style.transition='opacity 500ms ease 250ms';
+      center.style.opacity=1;
+    }
+
+    // final message + hearts at 5
+    if(stage>=5){
+      messageEl.textContent = `Nice. You just unlocked your first sunflower pumpkin.`;
+      burstHearts(22);
+      if(!easterEnabled){
+        easterEnabled = true;
+        document.addEventListener('keydown', secretListener);
+        tapArea.addEventListener('dblclick', secretReveal);
+      }
+    }
+  }
+
+  tapArea.addEventListener('click',()=>{
+    if(stage<5){ stage++; update(); }
+  });
+
+  resetBtn.addEventListener('click',()=>{
+    stage=0; messageEl.textContent='';
+    // reset visuals
+    stem.style.strokeDashoffset=260;
+    [...leaves,...petals].forEach(el=>{el.style.opacity=0;el.style.transform='scale(.3)'});
+    center.style.opacity=0;
+    stageEl.textContent='Stage 0 / 5';
+    easterEnabled=false;
+  });
+
+  // floating hearts ambient
+  function spawnHeart(){
+    const h=document.createElement('div');h.className='heart';
+    const size=8+Math.random()*12;h.style.width=h.style.height=size+'px';
+    h.style.left=Math.random()*100+'vw';h.style.bottom='-20px';
+    h.style.animation=`float ${6+Math.random()*6}s linear forwards`;
+    document.body.appendChild(h);setTimeout(()=>h.remove(),12000);
+  }
+  setInterval(spawnHeart,700);
+
+  function burstHearts(n){for(let i=0;i<n;i++){setTimeout(spawnHeart,i*60)}}
+
+  // prevent zoom on double tap (nicer on phones) + reveal easter egg on double tap
+  let last=0;document.addEventListener('touchend',e=>{const now=Date.now();if(now-last<=300){e.preventDefault(); secretReveal();}last=now},{passive:false});
+
+  // hidden easter egg message
+  function secretReveal(){
+    if(stage<5) return; // only after bloom
+    const old = messageEl.textContent;
+    messageEl.textContent = `Hey… thank you for coming today. I really enjoyed spending time with you 🌻`;
+    setTimeout(()=>{messageEl.textContent = old;}, 5000);
+  }
+
+  // keyboard code: type SUN
+  let seq='';
+  function secretListener(e){
+    seq += (e.key||'').toUpperCase();
+    if(seq.endsWith('SUN')) secretReveal();
+    if(seq.length>10) seq=seq.slice(-10);
+  }
+</script>
+</body>
+</html>
